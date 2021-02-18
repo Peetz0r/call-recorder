@@ -19,6 +19,8 @@ Place a call to test. Try speaking loud and softly, and listen to the earpiece a
 
 Open your file manager and browse to `~/Call Recorder`. There should be one `.oga` file now.
 
+You can check the logs via `journalctl -f --user --unit call-recorder`
+
 ## Limitations ##
 
 For now, it only records microphone audio. Therefore the results are best wen using the speaker, not earpiece.
