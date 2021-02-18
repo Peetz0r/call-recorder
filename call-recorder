@@ -4,22 +4,16 @@ print('Call Recorder is running')
 
 import dbus
 from dbus.mainloop.glib import DBusGMainLoop
-
-import gi
-gi.require_version("Gtk", "3.0")
-from gi.repository import GLib, Gtk
-
+from gi.repository import GLib
 from enum import Enum
 
 import os, subprocess, datetime, time, signal
 
+ffmpeg = None
+
 recordingsDir = f"{os.environ['HOME']}/Call Recordings/"
 
-if not os.path.isdir(recordingsDir):
-  print(f"Creating {recordingsDir}")
-  os.mkdir(recordingsDir)
-
-  ffmpeg = None
+DBusGMainLoop(set_as_default=True)
 
 class CallState(Enum):
   UNKNOWN = 0
@@ -49,7 +43,9 @@ CallDirection = Enum('CallDirection', {
   '📱➡': 2,
 })
 
-DBusGMainLoop(set_as_default=True)
+if not os.path.isdir(recordingsDir):
+  print(f"Creating {recordingsDir}")
+  os.mkdir(recordingsDir)
 
 def callHandler(old_state, new_state, reason, sender, path, interface):
   print(f'{CallState(old_state)} -> {CallState(new_state)}, reason: {CallStateReason(reason)}')
@@ -92,5 +88,3 @@ system_bus.add_signal_receiver(callHandler,
 
 loop = GLib.MainLoop()
 loop.run()
-
-
