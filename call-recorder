@@ -1,0 +1,96 @@
+#!/usr/bin/env -S python3 -u
+
+print('Call Recorder is running')
+
+import dbus
+from dbus.mainloop.glib import DBusGMainLoop
+
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import GLib, Gtk
+
+from enum import Enum
+
+import os, subprocess, datetime, time, signal
+
+recordingsDir = f"{os.environ['HOME']}/Call Recordings/"
+
+if not os.path.isdir(recordingsDir):
+  print(f"Creating {recordingsDir}")
+  os.mkdir(recordingsDir)
+
+  ffmpeg = None
+
+class CallState(Enum):
+  UNKNOWN = 0
+  DIALING = 1
+  RINGING_OUT = 2
+  RINGING_IN = 3
+  ACTIVE = 4
+  HELD = 5
+  WAITING = 6
+  TERMINATED = 7
+
+class CallStateReason(Enum):
+  UNKNOWN = 0
+  OUTGOING_STARTED = 1
+  INCOMING_NEW = 2
+  ACCEPTED = 3
+  TERMINATED = 4
+  REFUSED_OR_BUSY = 5
+  ERROR = 6
+  AUDIO_SETUP_FAILED = 7
+  TRANSFERRED = 8
+  DEFLECTED = 9
+
+CallDirection = Enum('CallDirection', {
+  '📱?': 0,
+  '📱⬅': 1,
+  '📱➡': 2,
+})
+
+DBusGMainLoop(set_as_default=True)
+
+def callHandler(old_state, new_state, reason, sender, path, interface):
+  print(f'{CallState(old_state)} -> {CallState(new_state)}, reason: {CallStateReason(reason)}')
+
+  global ffmpeg
+  if CallState(new_state) == CallState.ACTIVE:
+    details = system_bus.get_object(sender, path).GetAll(interface, dbus_interface='org.freedesktop.DBus.Properties')
+
+    d = datetime.datetime.now().strftime('%Y-%m-%d_%H.%M.%S')
+    filename = f"{recordingsDir}{d}_{(CallDirection(details['Direction']).name)}_{(details['Number'])}.oga"
+    print(f"Recording to {filename}")
+    ffmpeg = subprocess.Popen([
+      'ffmpeg', '-hide_banner',
+      '-loglevel', 'error', '-stats',
+      '-f', 'pulse',
+      '-i', 'default',
+      '-ac', '2',
+      '-ar', '44100',
+      '-ab', '160k',
+      '-acodec', 'libvorbis',
+      filename
+    ])
+
+  elif CallState(new_state) == CallState.TERMINATED:
+    print(f"Finalizing recording...")
+    time.sleep(1) # don't kill when the buffers still contail our last words
+    ffmpeg.send_signal(signal.SIGINT)
+    ffmpeg.wait()
+    print(f"Done!")
+
+system_bus = dbus.SystemBus()
+
+system_bus.add_signal_receiver(callHandler,
+  dbus_interface='org.freedesktop.ModemManager1.Call',
+  signal_name='StateChanged',
+  sender_keyword='sender',
+  path_keyword='path',
+  interface_keyword='interface'
+)
+
+loop = GLib.MainLoop()
+loop.run()
+
+

@@ -1,0 +1,9 @@
+[Unit]
+Description='Call Recorder'
+
+[Service]
+ExecStart=%h/bin/call-recorder
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
